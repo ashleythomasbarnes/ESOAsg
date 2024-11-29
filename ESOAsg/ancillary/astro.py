@@ -19,7 +19,9 @@ from os import path
 from os import remove
 from astroquery.mast import Observations
 
-import healpy
+# TODO - this is needed for the GW part. It should be updated or fixed or removed... 
+# Can't install on current version of mac for some reason...
+# import healpy 
 
 from ESOAsg import msgs
 from ESOAsg.ancillary import cleaning_lists
@@ -30,9 +32,9 @@ from ESOAsg.core import fitsfiles
 import matplotlib
 from matplotlib import pyplot as plt
 
+# TODO - Also needs fixing... 
 STARTING_MATPLOTLIB_BACKEND = matplotlib.rcParams["backend"]
-from ligo.skymap.tool.ligo_skymap_contour import main as ligo_skymap_contour
-
+# from ligo.skymap.tool.ligo_skymap_contour import main as ligo_skymap_contour
 matplotlib.rcParams["backend"] = STARTING_MATPLOTLIB_BACKEND
 
 

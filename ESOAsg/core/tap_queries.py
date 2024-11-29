@@ -37,8 +37,6 @@ COLUMNS_FROM_OBSCORE = ['target_name', 'dp_id', 's_ra', 's_dec', 't_exptime', 'e
                         'instrument_name', 'obstech', 'abmaglim', 'proposal_id', 'obs_collection']
 
 
-# I/O:
-
 def define_tap_service(which_tap_service):
     r"""Load a Table Access Protocol (TAP) service from defaults
 
@@ -563,3 +561,25 @@ def condition_collections_like(collections=None):
     # remove the last OR
     condition_collections = condition_collections[:-3]
     return condition_collections
+
+def condition_em_min_like(em_min=None, em_max=None):
+    r"""Create condition string to select only specific em_min and em_max in `ivoa.ObsCore`
+
+    Args:
+        em (list): limit the search to the selected list of em_min and em_max (e.g., `optical`)
+
+    Returns:
+        str: string containing the `em_min` and `em_max` condition for a query
+
+    """
+    condition_em = ''''''
+    if em_min is not None:
+        condition_em += f'''
+            AND 
+                em_min>{em_min}'''
+    if em_max is not None:
+        condition_em += f'''
+            AND 
+                em_max<{em_max}'''
+        
+    return condition_em

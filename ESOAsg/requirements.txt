@@ -8,5 +8,5 @@ packaging>=20.4
 pytest>=6.2
 # pyvo>=1.1
 requests>=2.25
-healpy>=1.14
+# healpy>=1.14
 # ligo.skymap>=0.5

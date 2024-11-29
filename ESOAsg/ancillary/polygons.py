@@ -12,7 +12,7 @@ managing polygons on the unit sphere.
 # - ancillary.astro
 
 import numpy as np
-from numpy.core.umath_tests import inner1d
+from numpy import inner
 
 __all__ = ['SingleSphericalPolygon', 'SphericalPolygon']
 
