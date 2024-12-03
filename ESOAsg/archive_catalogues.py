@@ -203,8 +203,10 @@ def get_catalogues(collections=None, tables=None, columns=None, type_of_query='s
 
     list_of_catalogues = []
     for table_name, maxrec_for_table in zip(clean_tables, maxrec_list):
+
         # test for columns
         columns_in_table = _is_column_list_in_catalogues(columns, tables=table_name)
+
         # instantiate ESOCatalogues
         query = tap_queries.create_query_table(table_name, columns=columns_in_table)
         query_table = query_catalogues.ESOCatalogues(query=query,
@@ -212,6 +214,7 @@ def get_catalogues(collections=None, tables=None, columns=None, type_of_query='s
                                                     maxrec=maxrec_for_table)
         if verbose:
             query_table.print_query()
+            
         query_table.run_query(to_string=True)
         catalogue = query_table.get_result_from_query()
         list_of_catalogues.append(catalogue)

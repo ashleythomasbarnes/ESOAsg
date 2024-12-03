@@ -368,7 +368,7 @@ def condition_source_ids_like(source_ids, source_id_name='SOURCEID'):
 # Observations
 
 
-def create_query_obscore_base(columns=None):
+def create_query_obscore_base(top=None, columns=None):
     r"""Create the base string for a query to `ivoa.ObsCore`
 
     If `columns` is set to None, default list of columns is set by the global variable `COLUMNS_FROM_OBSCORE`
@@ -380,13 +380,23 @@ def create_query_obscore_base(columns=None):
         str: Base for the `ivoa.ObsCore` queries
 
     """
+
     if columns is None:
         columns = COLUMNS_FROM_OBSCORE
-    query_base = '''
-            SELECT
+
+    if top is not None:
+        query_base = '''
+            SELECT TOP {}
                 {}
             FROM
-                ivoa.ObsCore'''.format(_create_comma_separated_list(columns))
+                ivoa.ObsCore'''.format(top, _create_comma_separated_list(columns))
+
+    else: 
+        query_base = '''
+                SELECT
+                    {}
+                FROM
+                    ivoa.ObsCore'''.format(_create_comma_separated_list(columns))
     return query_base
 
 
@@ -562,24 +572,96 @@ def condition_collections_like(collections=None):
     condition_collections = condition_collections[:-3]
     return condition_collections
 
-def condition_em_min_like(em_min=None, em_max=None):
+def condition_em_like(em_min=None, em_max=None, enclosed=True):
     r"""Create condition string to select only specific em_min and em_max in `ivoa.ObsCore`
 
     Args:
-        em (list): limit the search to the selected list of em_min and em_max (e.g., `optical`)
+        em_min (float): limit the search to the selected list of em_min (e.g., `>1000`)
+        em_max (float): limit the search to the selected list of em_max (e.g., `<10000`)
+        enclosed (bool): if set to `True` the condition will be `em_min > em_min` and `em_max < em_max`, otherwise
+            the condition will be `em_min < em_min` and `em_max > em_max`
 
     Returns:
         str: string containing the `em_min` and `em_max` condition for a query
 
     """
+
     condition_em = ''''''
-    if em_min is not None:
-        condition_em += f'''
-            AND 
-                em_min>{em_min}'''
-    if em_max is not None:
-        condition_em += f'''
-            AND 
-                em_max<{em_max}'''
+    if enclosed: 
+
+        if em_min is not None:
+            condition_em += f'''
+                AND 
+                    em_min>{em_min}'''
+            
+        if em_max is not None:
+            condition_em += f'''
+                AND 
+                    em_max<{em_max}'''
+    else:
+        if em_min is not None:
+            condition_em += f'''
+                AND 
+                    em_min<{em_min}'''
+            
+        if em_max is not None:
+            condition_em += f'''
+                AND 
+                    em_max>{em_max}'''
         
     return condition_em
+
+def condition_snr_like(snr=None):
+    r"""Create condition string to select only specific snr in `ivoa.ObsCore`
+
+    Args:
+        snr (list): limit the search to the selected list of snr (e.g., `>10`)
+
+    Returns:
+        str: string containing the `snr` condition for a query
+
+    """
+    condition_snr = ''''''
+    if snr is not None:
+        condition_snr = f'''
+            AND 
+                snr>{snr}'''
+        
+    return condition_snr
+
+def condition_em_res_power_like(em_res_power=None):
+    r"""Create condition string to select only specific em_res_power in `ivoa.ObsCore`
+
+    Args:
+        em_res_power (list): limit the search to the selected list of em_res_power (e.g., `>1000`)
+
+    Returns:
+        str: string containing the `em_res_power` condition for a query
+
+    """
+    condition_em_res_power = ''''''
+    if em_res_power is not None:
+        condition_em_res_power = f'''
+            AND 
+                em_res_power>{em_res_power}'''
+        
+    return condition_em_res_power
+
+def condition_order_by_like(order_by=None):
+    r"""Create condition string to select only specific order_by in `ivoa.ObsCore`
+
+    Args:
+        order_by (list): limit the search to the selected list of order_by (e.g., `t_exptime`)
+
+    Returns:
+        str: string containing the `order_by` condition for a query
+
+    """
+    condition_order_by = ''''''
+    if order_by is not None:
+        condition_order_by = f'''
+            ORDER BY 
+                {order_by}'''
+        
+    return condition_order_by
+

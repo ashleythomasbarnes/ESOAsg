@@ -15,8 +15,8 @@ from ESOAsg.ancillary import checks
 from ESOAsg.ancillary import cleaning_lists
 
 
-def query_from_radec(positions=None, radius=None, instruments=None, data_types=None, columns=None, verbose=False,
-                     maxrec=None, em_min=None, em_max=None):
+def query_from_radec(positions=None, radius=None, instruments=None, data_types=None, top=None, columns=None, verbose=False,
+                     maxrec=None, em_min=None, em_max=None, enclosed=True, snr=None, em_res_power=None, order_by=None):
     r"""Query the ESO archive for data at a given position in RA and Dec
 
     The `positions` value (or list) needs to be given as an
@@ -80,12 +80,16 @@ def query_from_radec(positions=None, radius=None, instruments=None, data_types=N
         position.transform_to(ICRS)
         ra, dec = np.float_(position.ra.degree), np.float_(position.dec.degree)
         msgs.work('Running query {} to the ESO archive (out of {} total)'.format(idx + 1, len(positions_list)))
+
         # Define query
-        query = "{0}{1}{2}{3}{4}".format(tap_queries.create_query_obscore_base(columns_list),
-                                      tap_queries.condition_intersects_ra_dec(ra, dec, radius=radius),
-                                      tap_queries.condition_instruments_like(instruments_list),
-                                      tap_queries.condition_data_types_like(data_types_list),
-                                      tap_queries.condition_em_min_like(em_min, em_max))
+        query = "{0}{1}{2}{3}{4}{5}{6}{7}".format(tap_queries.create_query_obscore_base(top, columns_list),
+                                                        tap_queries.condition_intersects_ra_dec(ra, dec, radius=radius),
+                                                        tap_queries.condition_instruments_like(instruments_list),
+                                                        tap_queries.condition_data_types_like(data_types_list),
+                                                        tap_queries.condition_em_like(em_min, em_max, enclosed),
+                                                        tap_queries.condition_snr_like(snr), 
+                                                        tap_queries.condition_em_res_power_like(em_res_power),
+                                                        tap_queries.condition_order_by_like(order_by))
         
         # instantiate ESOCatalogues
         query_for_observations = query_observations.ESOObservations(query=query, type_of_query='sync', maxrec=maxrec)
@@ -212,14 +216,17 @@ def writeFile( response, folder_path): #write content of file on disk
         return filename 
 
 
-def download(dp_ids, output_dir='./', min_disk_space=float(default.get_value('min_disk_space'))):
-    r"""Given a filename in the ADP format, the code download the file from the
-    `ESO archive <http://archive.eso.org>`_
+def download(dp_ids, output_dir='./', min_disk_space=float(default.get_value('min_disk_space')), 
+             base_url='https://dataportal.eso.org/dataPortal/', 
+             verbose=False):
+    r"""Given a filename in the ADP format, the code download the file from the dataportal.eso.org
 
     Args:
         dp_ids (any): list data product ID (or single product ID) to be downloaded
         min_disk_space (float): the file will be downloaded only if there is this amount of space (in Gb) free on the
             disk
+        base_url (str): base url to be used to download the file
+        verbose (bool): if set to `True` additional info will be displayed
 
     Returns:
         None
@@ -233,27 +240,66 @@ def download(dp_ids, output_dir='./', min_disk_space=float(default.get_value('mi
 
     for dp_id in dp_ids_list:
 
-        # Given a dp_id of a public file, the link to download it is constructed as follows:
-        base_url = 'http://archive.eso.org/datalink/links?ID=ivo://eso.org/'
-        download_url = f'{base_url}ID?{dp_id}&eso_download=file'
         msgs.work('Retrieving file {}.fits'.format(dp_id))
-        try: 
-            urllib.request.urlretrieve(download_url, filename=f'{output_dir}{dp_id}.fits')
-            msgs.info('File {}.fits downloaded'.format(dp_id))
-        except urllib.error.HTTPError as e:
-            msgs.info(f'No file downloaded - Response code: {e.code}')
+   
+        download_url = f"{base_url}file/{dp_id}"
+        if verbose:
+                print(download_url)
+        response = requests.get(download_url)
 
-        # msgs.work('Retrieving file {}.fits'.format(dp_id))
-        # base_url = 'https://dataportal.eso.org/dataportal_new/' #base url
-        # download_url = f"{base_url}soda/sync?ID={dp_id}"
-        # response = requests.get(download_url)
+        if response.status_code != 200:
+            msgs.info(f'No file downloaded - Response code: {response.status_code}')
+        else: 
+            output_filename = writeFile(response, output_dir) # Write the file to disk and get the filename
+            msgs.info(f'File {output_filename} downloaded')
 
-        # if response.status_code != 200:
-        #     msgs.info(f'No file downloaded - Response code: {response.status_code}')
-        # else: 
-        #     output_filename = writeFile(response, output_dir) # Write the file to disk and get the filename
-        #     msgs.info(f'File downloaded - Filename: {output_filename}')
 
+def download_cutout(dp_ids, output_dir='./', min_disk_space=float(default.get_value('min_disk_space')),
+                    base_url = 'https://dataportal.eso.org/dataPortal/', 
+                    em_min_cut=None, em_max_cut=None, 
+                    verbose=False):
+    r"""Given a filename in the ADP format, the code download the file from the dataportal.eso.org
+    A portion of the spectrum can be cropped by specifying the minimum and maximum wavelength
+    TODO: add the possibility to crop... 
+
+    Args:
+        dp_ids (any): list data product ID (or single product ID) to be downloaded
+        min_disk_space (float): the file will be downloaded only if there is this amount of space (in Gb) free on the
+            disk
+        base_url (str): base url to be used to download the file
+        em_min_cut (float, optional): minimum value of the wavelength to be cropped (in units of m)
+        em_max_cut (float, optional): maximum value of the wavelength to be cropped (in units of m)
+        verbose (bool): if set to `True` additional info will be displayed
+
+    Returns:
+        None
+
+    """
+    # Check for disk space
+    checks.check_disk_space(min_disk_space=min_disk_space)
+
+    # Cleaning list
+    dp_ids_list = cleaning_lists.from_element_to_list(cleaning_lists.from_bytes_to_string(dp_ids), element_type=str)
+
+    for dp_id in dp_ids_list:
+
+        msgs.work('Retrieving file {}.fits'.format(dp_id))
+  
+        if em_min_cut is not None or em_max_cut is not None:
+
+            em_min_int = int(em_min_cut*1e9) #convert to nm
+            em_max_int = int(em_max_cut*1e9) #convert to nm
+            cut_append = f"&PREFIX={em_min_int}-{em_max_int}&BAND={em_min_int}e-9+{em_max_int}e-9"
+            download_url = f"{base_url}soda/sync?ID={dp_id}{cut_append}"
+            if verbose:
+                print(download_url)
+            response = requests.get(download_url)
+
+            if response.status_code != 200:
+                msgs.info(f'No file downloaded - Response code: {response.status_code}')
+            else: 
+                output_filename = writeFile(response, output_dir) # Write the file to disk and get the filename
+                msgs.info(f'File {output_filename} downloaded')
 
 def columns_info(verbose=False):
     r"""Load a query that get names (and corresponding ucd) of the columns present in `ivoa.ObsCore`
