@@ -170,7 +170,7 @@ def query_from_polygons(polygons, instruments=None, data_types=None, verbose=Fal
                                       tap_queries.condition_intersects_polygon(polygon),
                                       tap_queries.condition_instruments_like(instruments_list),
                                       tap_queries.condition_data_types_like(data_types_list),
-                                      tap_queries.condition_em_min_like(em_min, em_max))
+                                      tap_queries.condition_em_like(em_min, em_max))
         # instantiate ESOCatalogues
         query_for_observations = query_observations.ESOObservations(query=query, type_of_query='sync', maxrec=maxrec)
         # running query and append results to the list
