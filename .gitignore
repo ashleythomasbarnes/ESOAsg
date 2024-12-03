@@ -2,3 +2,5 @@
 *.fits
 .DS_Store
 /ESOAsg/__pycache__
+/ESOAsg/__pycache__
+/ESOAsg/core/__pycache__
