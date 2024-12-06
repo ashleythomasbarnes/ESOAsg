@@ -6,6 +6,7 @@ import urllib # Library for opening URLs
 import requests # Library for making HTTP requests
 import os # Library for interacting with the operating system
 import cgi  # Library for parsing headers
+import glob # Library for searching directories
 
 from ESOAsg import msgs
 from ESOAsg import default
@@ -243,6 +244,12 @@ def download(dp_ids, output_dir='./', min_disk_space=float(default.get_value('mi
     dp_ids_list = cleaning_lists.from_element_to_list(cleaning_lists.from_bytes_to_string(dp_ids), element_type=str)
 
     for dp_id in dp_ids_list:
+
+        # Check if the file has been downloaded
+        check_files = glob.glob(output_dir + dp_id + '.*')
+        if len(check_files) > 0:
+            msgs.warning(f'File {dp_id}.fits already exists in {output_dir}')
+            continue
 
         msgs.work('Retrieving file {}.fits'.format(dp_id))
    
