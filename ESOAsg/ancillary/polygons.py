@@ -16,6 +16,32 @@ from numpy import inner
 
 __all__ = ['SingleSphericalPolygon', 'SphericalPolygon']
 
+def contour_to_polygon(contour, max_vertices=30):
+    r"""Converts a contour into a polygon
+
+    The resulting `polygons` is a list with N elements (with N matching the number of `contours`). Each elements
+    contains a string defining the location in the sky of the polygon with RA, Dec, separated by commas and with the
+    first RA, Dec pair that matches the last one (to close the polygon)
+
+    Args:
+        contours (list):
+        max_vertices (int):
+
+    Returns:
+        list: list of strings defining each polygon
+
+    """
+
+    if len(contour) > max_vertices:
+        contour_clean = contour[0: len(contour): int(len(contour) / max_vertices + 1)][0]
+    else:
+        contour_clean = contour[0]
+
+    # Construct the polygon as a string in the right format
+    polygon = ' '.join(['%.4f, %.4f,' % (ra, dec) for ra, dec in contour_clean])[
+                :-1]  # Remove the last character, which is an unwanted extra comma
+
+    return polygon
 
 def contours_to_polygons(contours, max_vertices=30):
     r"""Converts a contour into a polygon
@@ -32,17 +58,31 @@ def contours_to_polygons(contours, max_vertices=30):
         list: list of strings defining each polygon
 
     """
-    polygons = []
-    for iii, contour in enumerate(contours):
-        if len(contour) > max_vertices:
-            contour_clean = contour[0: len(contour): int(len(contour) / max_vertices + 1)]
-        else:
-            contour_clean = contour
-        # Construct the polygon as a string in the right format
-        polygon = ' '.join(['%.4f, %.4f,' % (ra, dec) for ra, dec in contour_clean])[
-                  :-1]  # Remove the last character, which is an unwanted extra comma
-        polygons.append(polygon)
-    return polygons
+    # If there are no contours, return an empty list
+    if len(contours) == 0:
+        print('No contours found')
+        return []
+    
+    # If there is only one contour, return a single polygon
+    elif len(contours) == 1:
+        print('Only one contour found - outputting single polygon')
+        return [contour_to_polygon(contours, max_vertices)]
+    
+    # If there are multiple contours, return multiple polygons
+    else:   
+        print('Multiple contours found - outputting multiple polygons')
+        polygons = []
+        for iii, contour in enumerate(contours):
+            if len(contour) > max_vertices:
+                contour_clean = contour[0: len(contour): int(len(contour) / max_vertices + 1)]
+            else:
+                contour_clean = contour
+            # Construct the polygon as a string in the right format
+            polygon = ' '.join(['%.4f, %.4f,' % (ra, dec) for ra, dec in contour_clean])[
+                    :-1]  # Remove the last character, which is an unwanted extra comma
+            polygons.append(polygon)
+
+        return polygons
 
 
 def two_d(vec):
@@ -79,7 +119,7 @@ def midpoint(a, b):
 
 
 def triple_product(a, b, c):
-    return inner1d(c, np.cross(a, b))
+    return inner(c, np.cross(a, b))
 
 
 def normalize_vector(xyz, output=None):
@@ -352,7 +392,24 @@ class SingleSphericalPolygon(object):
             if np.sum(orient) < 0.0:
                 orient = -1.0 * orient
             midpoint_ac = midpoint(a, c)
-            candidate = max(zip(orient, midpoint_ac), key=lambda x: x[0])
+
+            ### TODO - check why this is not now working... 
+            # candidate = max(zip(orient, midpoint_ac), key=lambda x: x[0]) #original
+            # print(orient)
+            # print(midpoint_ac)
+            # print(orient.shape, midpoint_ac.shape)
+            # candidate_index = np.argmax(orient)  # Find the index of the maximum value in `orient`
+            # candidate = (orient[candidate_index], midpoint_ac[candidate_index])
+            # candidate = np.nanmax([orient, midpoint_ac])
+            # candidate = np.max(orient)
+
+            # Assuming you want the first column of orient and all rows of midpoint_ac:
+            orient_1d = orient[:, 0]  # Extract a specific column or reshape
+            midpoint_ac_reshaped = midpoint_ac[:, 0]  # Extract or reshape accordingly
+            candidate = max(zip(orient_1d, midpoint_ac_reshaped), key=lambda x: x[0])
+
+
+            ### 
             inside = candidate[1]
         else:
             # Fall back on computing the mean point

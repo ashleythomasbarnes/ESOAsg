@@ -18,10 +18,7 @@ import importlib
 from os import path
 from os import remove
 from astroquery.mast import Observations
-
-# TODO - this is needed for the GW part. It should be updated or fixed or removed... 
-# Can't install on current version of mac for some reason...
-# import healpy 
+import healpy 
 
 from ESOAsg import msgs
 from ESOAsg.ancillary import cleaning_lists
@@ -33,9 +30,10 @@ import matplotlib
 from matplotlib import pyplot as plt
 
 # TODO - Also needs fixing... 
-STARTING_MATPLOTLIB_BACKEND = matplotlib.rcParams["backend"]
-# from ligo.skymap.tool.ligo_skymap_contour import main as ligo_skymap_contour
-matplotlib.rcParams["backend"] = STARTING_MATPLOTLIB_BACKEND
+# STARTING_MATPLOTLIB_BACKEND = matplotlib.rcParams["backend"]
+from ligo.skymap.tool.ligo_skymap_contour import main as ligo_skymap_contour
+import ligo.skymap.plot 
+# matplotlib.rcParams["backend"] = STARTING_MATPLOTLIB_BACKEND
 
 
 def download_kepler_data(target_name):
@@ -84,7 +82,7 @@ def download_tess_data(target_name):
     return True
 
 
-def download_gw_bayestar(superevent_name, file_name='bayestar.fits.gz'):
+def download_gw_bayestar(superevent_name, file_name='bayestar.fits.gz', output_dir='./'):
     r"""Download the bayestar.fits.gz of a GW superevent
 
     This is simply checking the existence of: `https://gracedb.ligo.org/superevents/<superevent_name>/files/`
@@ -104,16 +102,19 @@ def download_gw_bayestar(superevent_name, file_name='bayestar.fits.gz'):
     # Some checks
     assert isinstance(superevent_name, str), '{} is not a valid string'.format(superevent_name)
     assert isinstance(file_name, str), '{} is not a valid string'.format(file_name)
+    
     # Checks if superevent exists
     gw_files_url = 'https://gracedb.ligo.org/superevents/' + superevent_name + '/files/'
     checks.connection_to_website(gw_files_url)
+    
     # download the and save the superevent file
     gw_bayestar_url = 'https://gracedb.ligo.org/apiweb/superevents/' + superevent_name + '/files/' + file_name
     r = requests.get(gw_bayestar_url, allow_redirects=True)
+
     if r.status_code == 404:
         msgs.warning('Failed to access to: {}'.format(gw_bayestar_url))
-        return False
-    open(superevent_name + '_bayestar.fits.gz', 'wb').write(r.content)
+
+    open(output_dir+superevent_name+'_bayestar.fits.gz', 'wb').write(r.content)
 
     # check that the file actually arrived on disk
     if path.isfile(superevent_name + '_bayestar.fits.gz'):
@@ -122,12 +123,8 @@ def download_gw_bayestar(superevent_name, file_name='bayestar.fits.gz'):
             msgs.info('File {}_{} successfully downloaded'.format(superevent_name, file_name))
         else:
             msgs.warning('Not a valid fits file in: {}'.format(gw_bayestar_url))
-            return False
     else:
-        msgs.warning('Failed to download: {}'.format(gw_bayestar_url))
-        return False
-
-    return True
+        msgs.warning('Already downloaded: {}'.format(gw_bayestar_url))
 
 
 def contours_from_gw_bayestar(file_name, credible_level=50.):
@@ -146,13 +143,13 @@ def contours_from_gw_bayestar(file_name, credible_level=50.):
     """
 
     # Some checks
-    assert isinstance(file_name, (str, np.str)), '{} is not a valid string'.format(file_name)
+    assert isinstance(file_name, (str)), '{} is not a valid string'.format(file_name)
     if not checks.fits_file_is_valid(file_name):
         msgs.error('{} not a valid fits file'.format(file_name))
-    assert isinstance(credible_level, (int, float, np.int, np.float)), '`credible_level` is not a float or an int'
+    assert isinstance(credible_level, (int, float)), '`credible_level` is not a float or an int'
 
     # Create temporary file where to store output from ligo_skymap_contour
-    contour_tmp_file = '.' + file_name + '.tmp.json'
+    contour_tmp_file = file_name + '.tmp.json'
     if path.isfile(contour_tmp_file):
         remove(contour_tmp_file)
 
@@ -164,6 +161,7 @@ def contours_from_gw_bayestar(file_name, credible_level=50.):
         json_data = json_file.read()
     contours_dict = json.loads(json_data)
     json_file.close()
+    
     # cleaning up
     remove(contour_tmp_file)
 
@@ -231,107 +229,86 @@ def _array_split(array_in, thr):
     return np.split(xx_in, split_indices[0] + 1), np.split(yy_in, split_indices[0] + 1)
 
 
-def show_contours_from_gw_bayestar(file_name, contours=None, cmap='cylon', contours_color='C3',
-                                   show_figure=True, save_figure=None, matplotlib_backend=None):
-    r"""Show sky credibility from the input healpix map and plot the contours created with `contours_from_gw_bayestar`
+def show_contours_from_gw_bayestar(file_name, contours=None, cmap='cylon', contours_color='black',
+                                   credible_level=None, save_figure=None, return_fig=False):
+    """
+    Display a sky credibility map from a HEALPix map file and overlay contours indicating credible regions.
 
     Args:
-        file_name (`str`):
-            Fits files containing the HEALPix mask you would like to show.
-        contours (`list`):
-        cmap:
-        contours_color:
-        show_figure (`bool`):
-        save_figure (`str` or `None`):
-        matplotlib_backend:
+        file_name (str): Path to the FITS file containing the HEALPix map to display.
+        contours (list, optional): Precomputed contours to overlay. Defaults to None, in which case they are computed.
+        cmap (str, optional): Colormap to use for the HEALPix map. Defaults to 'cylon'.
+        contours_color (str, optional): Color of the contours. Defaults to 'black'.
+        credible_level (int or None, optional): Credible level percentage for the contours if they are computed.
+        save_figure (str or None, optional): File path to save the figure. Defaults to None (no saving).
+        return_fig (bool, optional): Whether to return the figure object. Defaults to False.
 
     Returns:
-
+        matplotlib.figure.Figure or None: The figure object if `return_fig` is True, otherwise None.
     """
-    # Some checks
-    assert isinstance(file_name, (str, np.str)), '{} is not a valid string'.format(file_name)
-    if not checks.fits_file_is_valid(file_name):
-        msgs.error('{} not a valid fits file'.format(file_name))
 
+    # Ensure the file_name argument is a valid string.
+    assert isinstance(file_name, (str)), f'{file_name} is not a valid string'
+    
+    # Check if the FITS file is valid using a helper function.
+    if not checks.fits_file_is_valid(file_name):
+        msgs.error(f'{file_name} is not a valid FITS file')
+
+    # Handle contours: if none are provided, generate them based on the credible level.
     if contours is None:
         msgs.warning("No contours defined, showing `credible_level=50` contours")
-        plot_contours = contours_from_gw_bayestar(file_name, credible_level=50.)
+        credible_level = credible_level or 50  # Default to 50% credible level if not specified
+        plot_contours = contours_from_gw_bayestar(file_name, credible_level=credible_level)
     else:
         plot_contours = contours
 
-    # ToDo find a more elegant solution for this.
-    # ligo.skymap.tool.ligo_skymap_contour introduces problems with the matplotlib backend. This i a workaround to
-    # get it running.
-    importlib.reload(matplotlib)
-    from matplotlib import pyplot as plt
-    if matplotlib_backend is None:
-        matplotlib.use(STARTING_MATPLOTLIB_BACKEND)
-        try:
-            # check if the script runs on a notebook.
-            # https://stackoverflow.com/questions/23883394/detect-if-python-script-is-run-from-an-ipython-shell-or
-            # -run-from
-            # -the-command-li
-            __IPYTHON__
-        except NameError:
-            # Try to get a working gui
-            # https://stackoverflow.com/questions/39026653/programmatically-choose-correct-backend-for-matplotlib-on
-            # -mac-os-x
-            gui_env = matplotlib.rcsetup.all_backends
-            for gui in gui_env:
-                try:
-                    matplotlib.use(gui, force=True)
-                    break
-                except:
-                    continue
-        else:
-            matplotlib.use('nbAgg')
-    else:
-        if matplotlib_backend in matplotlib.rcsetup.all_backends:
-            matplotlib.use(matplotlib_backend)
-        else:
-            msgs.error('{} is not a valid `matplolib` backend'.format(matplotlib_backend))
-
-    # Read map and get object name
+    # Read the HEALPix map data and header from the FITS file.
     map_data, map_header = healpy.read_map(file_name, h=True, verbose=False, dtype=None)
-    object_name_list = [value for name, value in map_header if name == 'OBJECT']
-    if len(object_name_list) > 0:
-        object_name = object_name_list[0]
-    else:
-        object_name = 'GW event - {}'.format(file_name)
+    map_header = dict(map_header)  # Convert header to a dictionary for easier access.
 
-    # start the plot
-    # ToDo fix matplotlibe error
-    """ 
-    plt.figure(figsize=(10., 7.))
-    ax = plt.axes([0.1, 0.1, 0.9, 0.9], projection='astro degrees mollweide')
+    # Extract object name and observation date/time from the FITS header.
+    object_name = map_header['OBJECT']
+    date = map_header['DATE'].split('T')[0]
+    time = map_header['DATE'].split('T')[1]
 
-    ax.grid(True)
+    # Initialize a plot with a Mollweide projection.
+    # Other nice examples given here - https://lscsoft.docs.ligo.org/ligo.skymap/plot/allsky.html
+    fig = plt.figure(figsize=(10., 7.))
+    ax = fig.add_subplot(111, projection='astro hours mollweide')
+
+    # Display the HEALPix map on the plot using the specified colormap.
     ax.imshow_hpx(map_data, cmap=cmap, visible=True, zorder=1)
-    ax.text(0.15, 0.95, object_name, horizontalalignment='center', verticalalignment='center',
-            transform=ax.transAxes, bbox=dict(facecolor='orange', alpha=0.8), fontsize=24)
-    # Convert the contour vertex coordinates from world to pixels and draw the contours
-    w = wcs.WCS(ax.header)
+    
+    # Add text annotations for the GW event name and credible level (if specified).
+    ax.text(0.0, 0.99, f'GW event - {object_name}', transform=ax.transAxes)
+    if credible_level is not None:
+        ax.text(0.0, 0.95, f'Credible level: {credible_level}%', transform=ax.transAxes, fontsize=8)
 
-    # Split a contour if two neighboring pixels are more distant than 10 degrees in RA
-    split_step = (10 * (ax.get_xlim()[1] - ax.get_xlim()[0]) / 360.)
+    # Prepare for drawing contours: convert world coordinates to pixel coordinates.
+    w = wcs.WCS(ax.header)  # Create a WCS object from the plot's header.
+
+    # Determine the step size to split contours into segments for smoother plotting.
+    split_step = (10 * (ax.get_xlim()[1] - ax.get_xlim()[0]) / 360.)  # 10-degree step in RA.
+
+    # Loop through each contour and draw it on the plot.
     for contour_world in plot_contours:
-        contour_pix = w.wcs_world2pix(contour_world, 0)
-        x_contours, y_contours = _array_split(contour_pix, split_step)
+        contour_pix = w.wcs_world2pix(contour_world, 0)  # Convert contour coordinates to pixels.
+        x_contours, y_contours = _array_split(contour_pix, split_step)  # Split into manageable segments.
         for x_contour, y_contour in zip(x_contours, y_contours):
-            ax.plot(x_contour, y_contour, linewidth=2.5, color=contours_color, zorder=5)  # , marker='o')
+            ax.plot(x_contour, y_contour, linewidth=0.75, color=contours_color, zorder=5)
 
-    if save_figure is not None:
-        plt.savefig(save_figure, dpi=200., format='pdf', bbox_inches='tight')
+    # Add a grid to the plot for reference.
+    ax.grid(True, ls=':', alpha=0.2, color='black')
 
-    if show_figure:
-        plt.show()
+    # Save the figure to the specified file if `save_figure` is provided.
+    if save_figure is not None: 
+        print(f'Saving figure to {save_figure}')
+        fig.savefig(save_figure, bbox_inches='tight')
 
-    plt.close()
-    """
-
-    # Bringing back the previously used matplotlib backend
-    matplotlib.use(STARTING_MATPLOTLIB_BACKEND)
-
+    # Return the figure object if `return_fig` is True.
+    if return_fig: 
+        return fig
+    
 
 def mag2f_nu(abmags):
     r"""Convert list of AB magnitudes in a list of spectral flux densities per unit frequency in jansky

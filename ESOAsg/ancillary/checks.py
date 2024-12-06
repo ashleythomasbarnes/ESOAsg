@@ -51,7 +51,7 @@ def check_disk_space(min_disk_space=float(default.get_value('min_disk_space'))) 
     return enough_space
 
 
-def connection_to_website(url, timeout=1.) -> bool:  # written by Ema 05.03.2020
+def connection_to_website(url, timeout=20.) -> bool:  # written by Ema 05.03.2020
     r"""Check there is an active connection to a website
 
     Args:
