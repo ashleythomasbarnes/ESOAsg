@@ -236,7 +236,7 @@ def download(dp_ids, output_dir='./', min_disk_space=float(default.get_value('mi
     checks.check_disk_space(min_disk_space=min_disk_space)
 
     # Check if list
-    if not isinstance(dp_ids, list):
+    if isinstance(dp_ids, str):
         dp_ids = [dp_ids]
 
     # Cleaning list
