@@ -243,12 +243,18 @@ def download(dp_ids, output_dir='./', min_disk_space=float(default.get_value('mi
     # Cleaning list
     dp_ids_list = cleaning_lists.from_element_to_list(cleaning_lists.from_bytes_to_string(dp_ids), element_type=str)
 
+    # Initialize the list of output filenames
+    output_filenames = []
+
     for dp_id in dp_ids_list:
 
         # Check if the file has been downloaded
         check_files = glob.glob(output_dir + dp_id + '.*')
         if len(check_files) > 0:
-            msgs.warning(f'File {dp_id}.fits already exists in {output_dir}')
+            output_filename = check_files[0] # The file has been downloaded
+            output_filename = os.path.basename(check_files[0]) # Get the filename
+            output_filenames.append(output_filename) # Append the filename to the list
+            msgs.info(f'File {output_filename} already exists in {output_dir}')
             continue
 
         msgs.work('Retrieving file {}.fits'.format(dp_id))
@@ -262,7 +268,16 @@ def download(dp_ids, output_dir='./', min_disk_space=float(default.get_value('mi
             msgs.info(f'No file downloaded - Response code: {response.status_code}')
         else: 
             output_filename = writeFile(response, output_dir) # Write the file to disk and get the filename
+
+            # TODO: Make this more elegant
+            check_files = glob.glob(output_dir + dp_id + '.*')
+            output_filename = check_files[0] # The file has been downloaded
+            output_filename = os.path.basename(check_files[0]) # Get the filename
+            output_filenames.append(output_filename) # Append the filename to the list
+
             msgs.info(f'File {output_filename} downloaded')
+
+    return output_filenames
 
 
 def download_cutout(dp_ids, output_dir='./', min_disk_space=float(default.get_value('min_disk_space')),
@@ -283,16 +298,35 @@ def download_cutout(dp_ids, output_dir='./', min_disk_space=float(default.get_va
         verbose (bool): if set to `True` additional info will be displayed
 
     Returns:
-        None
+        output_filenames (list): list of the filenames downloaded
 
     """
     # Check for disk space
     checks.check_disk_space(min_disk_space=min_disk_space)
 
+    # Check if list
+    if isinstance(dp_ids, str):
+        dp_ids = [dp_ids]
+
     # Cleaning list
     dp_ids_list = cleaning_lists.from_element_to_list(cleaning_lists.from_bytes_to_string(dp_ids), element_type=str)
 
+    # Initialize the list of output filenames
+    output_filenames = []
+
     for dp_id in dp_ids_list:
+
+        em_min_int = int(em_min_cut*1e9) #convert to nm
+        em_max_int = int(em_max_cut*1e9) #convert to nm
+
+        # Check if the file has been downloaded
+        check_files = glob.glob(f'{output_dir}{dp_id}_TARGET_{em_min_int}-{em_max_int}.*')
+        if len(check_files) > 0:
+            output_filename = check_files[0] # The file has been downloaded
+            output_filename = os.path.basename(check_files[0]) # Get the filename
+            output_filenames.append(output_filename) # Append the filename to the list
+            msgs.info(f'File {output_filename} already exists in {output_dir}')
+            continue
 
         msgs.work('Retrieving file {}.fits'.format(dp_id))
   
@@ -310,7 +344,16 @@ def download_cutout(dp_ids, output_dir='./', min_disk_space=float(default.get_va
                 msgs.info(f'No file downloaded - Response code: {response.status_code}')
             else: 
                 output_filename = writeFile(response, output_dir) # Write the file to disk and get the filename
+
+                # TODO: Make this more elegant
+                check_files = glob.glob(f'{output_dir}{dp_id}_TARGET_{em_min_int}-{em_max_int}.*')
+                output_filename = check_files[0] # The file has been downloaded
+                output_filename = os.path.basename(check_files[0]) # Get the filename
+                output_filenames.append(output_filename) # Append the filename to the list
+
                 msgs.info(f'File {output_filename} downloaded')
+
+    return output_filenames
 
 def columns_info(verbose=False):
     r"""Load a query that get names (and corresponding ucd) of the columns present in `ivoa.ObsCore`
