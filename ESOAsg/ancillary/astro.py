@@ -302,7 +302,8 @@ def show_contours_from_gw_bayestar(file_name, contours=None, cmap='cylon', conto
 
     # Save the figure to the specified file if `save_figure` is provided.
     if save_figure is not None: 
-        print(f'Saving figure to {save_figure}')
+        msgs.info(f'Saving figure to {save_figure}')
+        # print(f'Saving figure to {save_figure}')
         fig.savefig(save_figure, bbox_inches='tight')
 
     # Return the figure object if `return_fig` is True.
