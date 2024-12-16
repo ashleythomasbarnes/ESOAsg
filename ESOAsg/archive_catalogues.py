@@ -164,8 +164,8 @@ def columns_info(collections=None, tables=None, verbose=False):
     return all_columns_table
 
 
-def get_catalogues(collections=None, tables=None, columns=None, type_of_query='sync', all_versions=False,
-                   maxrec=None, verbose=False):
+def get_catalogues(collections=None, tables=None, columns=None, type_of_query='sync', all_versions=False, maxrec=None, verbose=False,
+                   top=None, order_by=None):
     r"""Query the ESO tap_cat service for specific catalogues
 
     There are two ways to select the catalogues you are interested in. Either you select directly the table_name (or the
@@ -193,7 +193,6 @@ def get_catalogues(collections=None, tables=None, columns=None, type_of_query='s
         any: `astropy.table` or `list` of `astropy.tables` containing the queried catalogues
 
     """
-    # ToDo EMA: conditions to select properties from catalogues should be added in this. Both with ANDs and with ORs
     # Obtain list of all tables derived from the merger of collections and tables
     clean_tables = _is_collection_and_table_list_at_eso(collections=collections, tables=tables,
                                                         all_versions=all_versions)
@@ -208,7 +207,10 @@ def get_catalogues(collections=None, tables=None, columns=None, type_of_query='s
         columns_in_table = _is_column_list_in_catalogues(columns, tables=table_name)
 
         # instantiate ESOCatalogues
-        query = tap_queries.create_query_table(table_name, columns=columns_in_table)
+        query = "{0}{1}".format(tap_queries.create_query_table_base(table_name, columns=columns_in_table, top=top),
+                                tap_queries.condition_order_by_like(order_by))
+
+
         query_table = query_catalogues.ESOCatalogues(query=query,
                                                     type_of_query=type_of_query, 
                                                     maxrec=maxrec_for_table)

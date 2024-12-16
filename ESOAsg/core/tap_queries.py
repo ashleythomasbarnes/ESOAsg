@@ -318,22 +318,33 @@ def create_query_all_columns(collections=None, tables=None):
     return query_all_columns
 
 
-def create_query_table(table_name, columns=None):
+def create_query_table_base(table_name, columns=None, top=None):
     r"""Create a query to return selected columns from a table
 
     Args:
         columns (list, optional): list of `str` containing the columns that will be queried
         table_name (str): name of the table that will be queried
+        top (int, optional): number of rows that will be returned. If set to `None` all rows will be returned
 
     Returns:
         str: query to obtain data from a table
 
     """
-    query = '''
-            SELECT 
+
+    if top is not None:
+        query = '''
+            SELECT TOP {}
                 {} 
             FROM 
-                {}'''.format(_create_comma_separated_list(columns), table_name)
+                {}'''.format(top, _create_comma_separated_list(columns), table_name)
+
+    else:
+        query = '''
+                SELECT 
+                    {} 
+                FROM 
+                    {}'''.format(_create_comma_separated_list(columns), table_name)
+    
     return query
 
 
