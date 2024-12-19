@@ -436,6 +436,34 @@ def create_query_obscore_all_columns():
             table_name='ivoa.ObsCore' '''
     return query_obscore_all_columns
 
+def condition_contains_ra_dec(ra, dec, radius=None, catalogue=True, ra_name='ra', dec_name='dec'):
+    r"""Create the WHERE CONTAINS condition string for a query with usage in obs or cat
+
+    Args:
+        ra (float): RA of the target in degrees and in the ICRS system
+        dec (float): Dec of the target in degrees and in the ICRS system
+        radius (float, optional): Search radius in arcsec. 
+
+    Returns:
+        str: String containing the WHERE INTERSECT condition for a query
+
+    """
+
+    if catalogue:
+        query_intersects_ra_dec = '''
+            WHERE
+                CONTAINS(point('', {0}, {1}), CIRCLE('ICRS',{2},{3},{4})) = 1'''.format(ra_name,
+                                                                                      dec_name, 
+                                                                                    str(ra),
+                                                                                    str(dec),
+                                                                                    str(radius/3600.))
+    else: 
+        query_intersects_ra_dec = '''
+            WHERE
+                CONTAINS(s_region,CIRCLE('ICRS',{0},{1},{2})) = 1'''.format(str(ra),
+                                                                                    str(dec),
+                                                                                    str(radius/3600.))
+    return query_intersects_ra_dec
 
 def condition_intersects_ra_dec(ra, dec, radius=None):
     r"""Create the WHERE INTERSECTS condition string for a query

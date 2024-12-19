@@ -1,5 +1,7 @@
 import numpy as np
 from astropy.table import MaskedColumn, join
+from astropy import coordinates
+from astropy.coordinates import ICRS
 
 from ESOAsg import msgs
 from ESOAsg.ancillary import cleaning_lists
@@ -188,6 +190,10 @@ def get_catalogues(collections=None, tables=None, columns=None, type_of_query='s
         maxrec (int, optional): define the maximum number of entries that a single query can return. If it is `None` the
             value is set by the limit of the service.
         verbose (bool): if set to `True` additional info will be displayed
+        conditions_dict (dict): dictionary containing the conditions to be applied to the query
+        top (int): number of top rows to be returned
+        order_by (str): column name to be used to order the query
+        order (str): order of the query (ascending or descending)
 
     Returns:
         any: `astropy.table` or `list` of `astropy.tables` containing the queried catalogues
@@ -219,10 +225,6 @@ def get_catalogues(collections=None, tables=None, columns=None, type_of_query='s
         query_table = query_catalogues.ESOCatalogues(query=query,
                                                     type_of_query=type_of_query, 
                                                     maxrec=maxrec_for_table)
-            
-        # # Print query - not so helpful to print after the fact...
-        # if verbose:
-        #     query_table.print_query()
         
         query_table.run_query(to_string=True)
         catalogue = query_table.get_result_from_query()
@@ -236,7 +238,153 @@ def get_catalogues(collections=None, tables=None, columns=None, type_of_query='s
         return list_of_catalogues[0]
     else:
         return list_of_catalogues
+    
 
+def query_tap(query, type_of_query='sync', verbose=False, maxrec=None):
+    r"""Query the ESO tap_cat service for specific catalogues
+
+    There are two ways to select the catalogues you are interested in. Either you select directly the table_name (or the
+    list of table_names) that you want to query, or you select a collection (or a list of collections). If you select
+    this latter option, what happens in the background is that the code is going to search for the table(s)
+    corresponding to the given collection and query them.
+
+    If you are asking for more than one table, the result will be listed in a list of `astropy.tables` with one element
+    per retrieved table
+
+    Args:
+        collections (any): list of `str` containing the names (or a single `str`) of the collections for
+            which the query will be limited
+        tables (any): list of `str` containing the table_name of the tables for which the query will be limited
+        columns (any): list of the `column_name` that you want to download. The full list of the columns in a
+            table can be found by running `columns_info()`
+        all_versions (bool): if set to `True` also obsolete versions of the catalogues are searched in case
+            `collections` is given
+        type_of_query (str): type of query to be run
+        maxrec (int, optional): define the maximum number of entries that a single query can return. If it is `None` the
+            value is set by the limit of the service.
+        verbose (bool): if set to `True` additional info will be displayed
+        conditions_dict (dict): dictionary containing the conditions to be applied to the query
+        top (int): number of top rows to be returned
+        order_by (str): column name to be used to order the query
+        order (str): order of the query (ascending or descending)
+
+    Returns:
+        any: `astropy.table` or `list` of `astropy.tables` containing the queried catalogues
+
+    """
+
+    # Print query
+    if verbose: 
+        tap_queries.print_query(query)
+
+    # instantiate ESOcatalogues
+    query_table = query_catalogues.ESOCatalogues(query=query,
+                                                type_of_query=type_of_query, 
+                                                maxrec=maxrec)
+    
+    query_table.run_query(to_string=True)
+    catalogue = query_table.get_result_from_query()
+
+    msgs.info('The query returned {} entries (with a limit set to maxrec={})'.format(len(catalogue),
+                                                                                            maxrec))
+    
+    return catalogue
+
+
+def get_catalogues_radec(collections=None, tables=None, columns=None, type_of_query='sync', all_versions=False, maxrec=None, verbose=False,
+                   conditions_dict=None, top=None, order_by=None, order='ascending', positions=None, radius=None):
+    r"""Query the ESO tap_cat service for specific catalogues at a given position on the sky with a given radius
+
+    There are two ways to select the catalogues you are interested in. Either you select directly the table_name (or the
+    list of table_names) that you want to query, or you select a collection (or a list of collections). If you select
+    this latter option, what happens in the background is that the code is going to search for the table(s)
+    corresponding to the given collection and query them.
+
+    If you are asking for more than one table, the result will be listed in a list of `astropy.tables` with one element
+    per retrieved table
+
+    Args:
+        collections (any): list of `str` containing the names (or a single `str`) of the collections for
+            which the query will be limited
+        tables (any): list of `str` containing the table_name of the tables for which the query will be limited
+        columns (any): list of the `column_name` that you want to download. The full list of the columns in a
+            table can be found by running `columns_info()`
+        all_versions (bool): if set to `True` also obsolete versions of the catalogues are searched in case
+            `collections` is given
+        type_of_query (str): type of query to be run
+        maxrec (int, optional): define the maximum number of entries that a single query can return. If it is `None` the
+            value is set by the limit of the service.
+        verbose (bool): if set to `True` additional info will be displayed
+        conditions_dict (dict): dictionary containing the conditions to be applied to the query
+        top (int): number of top rows to be returned
+        order_by (str): column name to be used to order the query
+        order (str): order of the query (ascending or descending)
+        positions (any): list of `astropy.coordinates.SkyCoord` containing the positions for which the query will be
+            limited
+        radius (float): radius in arcseconds around the position to be queried
+
+    Returns:
+        any: `astropy.table` or `list` of `astropy.tables` containing the queried catalogues
+
+    """
+    # Check inputs:
+    # Working on positions
+    positions_list = cleaning_lists.from_element_to_list(positions, element_type=coordinates.SkyCoord)
+    # Working on radius
+    if radius is not None:
+        if isinstance(radius, int):
+            radius = float(radius)
+        else:
+            assert isinstance(radius, float), r'Input radius is not a number'
+
+    # Obtain list of all tables derived from the merger of collections and tables
+    clean_tables = _is_collection_and_table_list_at_eso(collections=collections, tables=tables,
+                                                        all_versions=all_versions)
+
+    # if maxrec is set to None, the entire length of the catalogue is considered:
+    maxrec_list = _get_catalogue_length_from_tables(clean_tables, maxrec=maxrec, all_versions=all_versions)
+
+    list_of_catalogues = []
+    for table_name, maxrec_for_table, position in zip(clean_tables, maxrec_list, positions_list):
+
+        position.transform_to(ICRS)
+        ra, dec = np.float_(position.ra.degree), np.float_(position.dec.degree)
+
+        # test for columns
+        columns_in_table = _is_column_list_in_catalogues(columns, tables=table_name)
+
+        all_columns_in_table = columns_info(tables=table_name)
+
+        ra_name = all_columns_in_table['column_name'][all_columns_in_table['ucd'] == 'pos.eq.ra;meta.main'].data.data[0]
+        dec_name = all_columns_in_table['column_name'][all_columns_in_table['ucd'] == 'pos.eq.dec;meta.main'].data.data[0]
+        
+        # form query
+        query = "{0}{1}{2}{3}".format(tap_queries.create_query_table_base(table_name, columns=columns_in_table, top=top),
+                                        tap_queries.condition_contains_ra_dec(ra, dec, radius=radius, ra_name=ra_name, dec_name=dec_name),
+                                        tap_queries.conditions_dict_like(conditions_dict),
+                                        tap_queries.condition_order_by_like(order_by, order))
+
+        # Print query
+        if verbose: 
+            tap_queries.print_query(query)
+
+        # instantiate ESOcatalogues
+        query_table = query_catalogues.ESOCatalogues(query=query,
+                                                    type_of_query=type_of_query, 
+                                                    maxrec=maxrec_for_table)
+        
+        query_table.run_query(to_string=True)
+        catalogue = query_table.get_result_from_query()
+        list_of_catalogues.append(catalogue)
+        msgs.info('The query to {} returned {} entries (with a limit set to maxrec={})'.format(table_name,
+                                                                                               len(catalogue),
+                                                                                               maxrec_for_table))
+    if len(list_of_catalogues) == 0:
+        return None
+    elif len(list_of_catalogues) == 1:
+        return list_of_catalogues[0]
+    else:
+        return list_of_catalogues
 
 def _get_id_ra_dec_from_columns(collections=None):
     r"""Returns the column names corresponding to source ID, RA, and DEC from a list of collections
