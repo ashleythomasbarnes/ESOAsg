@@ -28,6 +28,8 @@ from pyvo.dal import DALFormatError
 from ESOAsg import default
 from ESOAsg import msgs
 
+import numpy as np
+
 # currently supported tap services
 TAP_SERVICES = ['eso_tap_cat', 'eso_tap_obs']
 # type of queries currently allowed
@@ -142,10 +144,17 @@ def run_query_sync(tap_service, query, maxrec=default.get_value('maxrec')):
 
     """
     try:
-        result_from_query = tap_service.search(query=query, maxrec=maxrec).to_table()
+        if maxrec is None:
+            result_from_query = tap_service.search(query=query, maxrec=maxrec).to_table()
+        else: 
+            result_from_query = tap_service.search(query=query, maxrec=int(maxrec)).to_table()
+
     except (ValueError, DALQueryError, DALFormatError):
-        msgs.warning('The query timed out. Trying `async` instead')
-        result_from_query = run_query_async(tap_service=tap_service, query=query, maxrec=maxrec)
+        msgs.warning('The query timed out. Trying with maxrec=100, but consider using `async` instead.')
+        result_from_query = tap_service.search(query=query, maxrec=100).to_table()
+        # msgs.error('The query failed. Trying `async` instead.')
+        # msgs.warning('The query timed out. Trying `async` instead')
+        # result_from_query = run_query_async(tap_service=tap_service, query=query, maxrec=maxrec)
     return result_from_query
 
 
@@ -336,7 +345,7 @@ def create_query_table_base(table_name, columns=None, top=None):
             SELECT TOP {}
                 {} 
             FROM 
-                {}'''.format(top, _create_comma_separated_list(columns), table_name)
+                {}'''.format(int(top), _create_comma_separated_list(columns), table_name)
 
     else:
         query = '''
@@ -658,7 +667,7 @@ def condition_em_res_power_like(em_res_power=None):
         
     return condition_em_res_power
 
-def condition_order_by_like(order_by=None):
+def condition_order_by_like(order_by=None, order='ascending'):
     r"""Create condition string to select only specific order_by in `ivoa.ObsCore`
 
     Args:
@@ -670,9 +679,26 @@ def condition_order_by_like(order_by=None):
     """
     condition_order_by = ''''''
     if order_by is not None:
-        condition_order_by = f'''
-            ORDER BY 
-                {order_by}'''
+
+        if order == 'descending':
+            condition_order_by = f'''
+                ORDER BY 
+                    {order_by} DESC'''
+
+        else: 
+            condition_order_by = f'''
+                ORDER BY 
+                    {order_by} ASC'''
         
     return condition_order_by
 
+def conditions_dict_like(conditions_dict=None):
+    
+    conditions_query = ''''''
+    if conditions_dict is not None:
+        for key, value in conditions_dict.items():
+            conditions_query += f'''
+                WHERE
+                    {key}={value}''' 
+            
+    return conditions_query

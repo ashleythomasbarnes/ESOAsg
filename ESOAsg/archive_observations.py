@@ -91,11 +91,11 @@ def query_from_radec(positions=None, radius=None, instruments=None, data_types=N
                                                         tap_queries.condition_snr_like(snr), 
                                                         tap_queries.condition_em_res_power_like(em_res_power),
                                                         tap_queries.condition_order_by_like(order_by))
-        
-        # instantiate ESOCatalogues
+
+        # instantiate ESOobservations
         query_for_observations = query_observations.ESOObservations(query=query, type_of_query='sync', maxrec=maxrec)
 
-        # running query and append results to the list
+        # Print query
         if verbose:
             query_for_observations.print_query()
 

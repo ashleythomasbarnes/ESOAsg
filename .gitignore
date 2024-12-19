@@ -13,3 +13,4 @@ doc/notebooks/data/velocity.csv
 *.pyc
 *.pyc
 /ESOAsg/__pycache__
+*.pyc

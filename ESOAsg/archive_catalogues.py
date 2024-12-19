@@ -165,7 +165,7 @@ def columns_info(collections=None, tables=None, verbose=False):
 
 
 def get_catalogues(collections=None, tables=None, columns=None, type_of_query='sync', all_versions=False, maxrec=None, verbose=False,
-                   top=None, order_by=None):
+                   conditions_dict=None, top=None, order_by=None, order='ascending'):
     r"""Query the ESO tap_cat service for specific catalogues
 
     There are two ways to select the catalogues you are interested in. Either you select directly the table_name (or the
@@ -206,17 +206,24 @@ def get_catalogues(collections=None, tables=None, columns=None, type_of_query='s
         # test for columns
         columns_in_table = _is_column_list_in_catalogues(columns, tables=table_name)
 
-        # instantiate ESOCatalogues
-        query = "{0}{1}".format(tap_queries.create_query_table_base(table_name, columns=columns_in_table, top=top),
-                                tap_queries.condition_order_by_like(order_by))
+        # form query
+        query = "{0}{1}{2}".format(tap_queries.create_query_table_base(table_name, columns=columns_in_table, top=top),
+                                    tap_queries.conditions_dict_like(conditions_dict),
+                                    tap_queries.condition_order_by_like(order_by, order))
 
+        # Print query
+        if verbose: 
+            tap_queries.print_query(query)
 
+        # instantiate ESOcatalogues
         query_table = query_catalogues.ESOCatalogues(query=query,
                                                     type_of_query=type_of_query, 
                                                     maxrec=maxrec_for_table)
-        if verbose:
-            query_table.print_query()
             
+        # # Print query - not so helpful to print after the fact...
+        # if verbose:
+        #     query_table.print_query()
+        
         query_table.run_query(to_string=True)
         catalogue = query_table.get_result_from_query()
         list_of_catalogues.append(catalogue)
